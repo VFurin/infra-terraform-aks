@@ -1,0 +1,7 @@
+resource_group_name = "tech-challenge"
+location            = "East US"
+cluster_name        = "tech-challenge-aks-cluster"
+dns_prefix          = "aks"
+subscription_id     = "7f030d81-0101-49c8-9167-01e20738d795"  
+appId               = "8f7c7988-ab8c-4060-884a-c3016338303a"
+password            = "BqY8Q~Tpf~hfUb6HdPimDQjfvYLIOQUemgFFBb6a"

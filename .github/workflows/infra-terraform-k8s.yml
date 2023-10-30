@@ -1,0 +1,105 @@
+name: Terraform-AKS-Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+env:
+  working-directory: infra_terraform
+  working-directory-k8s: k8s_manifests
+  ARM_CLIENT_ID: ${{secrets.TF_CLIENT_ID}}
+  ARM_CLIENT_SECRET: ${{secrets.TF_ARM_CLIENT_SECRET}}
+  ARM_SUBSCRIPTION_ID: ${{secrets.TF_SUBSCRIPTION_ID}}
+  ARM_TENANT_ID: ${{secrets.TF_TENANT_ID}}
+  RESOURCE_GROUP: "tech-challenge-rg"
+  CLUSTER_NAME: "tech-challenge-aks-cluster"
+
+permissions:
+  id-token: write
+  contents: read
+  
+jobs:          
+  setup-terraform:
+    runs-on: ubuntu-latest
+   
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_wrapper: false
+    
+    - name: Terraform Init
+      id: init
+      run: terraform init
+      working-directory: ${{env.working-directory}}
+  terraform-validate:
+    needs: setup-terraform
+    runs-on: ubuntu-latest
+    steps:
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate
+      working-directory: ${{env.working-directory}}
+  terraform-plan:
+    needs: terraform-validate
+    runs-on: ubuntu-latest
+    steps:
+    - name: Terraform Plan
+      id: plan
+      run: terraform plan -no-color
+      working-directory: ${{env.working-directory}}
+  terraform-apply:
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Terraform Apply
+      id: apply
+      run: terraform apply -auto-approve
+      working-directory: ${{env.working-directory}}
+  terraform-output:
+    needs: terraform-apply
+    runs-on: ubuntu-latest
+    steps:
+    - name: Terraform Output
+      id: output
+      run: | 
+       terraform output kube_config > kubeconfig
+       mkdir -p $HOME/.kube
+       mv kubeconfig $HOME/.kube/config
+          
+  deploy_manifests:
+    needs: setup-terraform
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    
+    - name: Az CLI login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Azure CLI script
+      uses: azure/CLI@v1
+      with:
+        azcliversion: latest
+        inlineScript: |
+          az account show
+          az group list
+    
+    - name: Configure kubectl
+      run: |
+        az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}}
+      env:
+        kubeconfig: ${{env.HOME}}/.kube/config
+
+    - name: Deploy Kubernetes Manifests
+      run: |
+        kubectl apply -f ${{env.working-directory-k8s}}

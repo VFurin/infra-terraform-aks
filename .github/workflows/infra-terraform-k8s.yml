@@ -72,7 +72,7 @@ jobs:
        mv kubeconfig $HOME/.kube/config
           
   deploy_manifests:
-    needs: setup-terraform
+    needs: terraform-output
     runs-on: ubuntu-latest
 
     steps:

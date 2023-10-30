@@ -36,34 +36,65 @@ jobs:
       id: init
       run: terraform init
       working-directory: ${{env.working-directory}}
+
   terraform-validate:
     needs: setup-terraform
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
     - name: Terraform Validate
       id: validate
       run: terraform validate
       working-directory: ${{env.working-directory}}
+
   terraform-plan:
     needs: terraform-validate
     runs-on: ubuntu-latest
+
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
     - name: Terraform Plan
       id: plan
       run: terraform plan -no-color
       working-directory: ${{env.working-directory}}
+
   terraform-apply:
     needs: terraform-plan
     runs-on: ubuntu-latest
+
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
     - name: Terraform Apply
       id: apply
       run: terraform apply -auto-approve
       working-directory: ${{env.working-directory}}
+
   terraform-output:
     needs: terraform-apply
     runs-on: ubuntu-latest
+
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
     - name: Terraform Output
       id: output
       run: | 

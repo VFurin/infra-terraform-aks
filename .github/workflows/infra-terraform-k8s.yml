@@ -76,7 +76,7 @@ jobs:
     - name: Az CLI login
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        creds: '{"clientId":"${{ secrets.CLIENT_ID }}","clientSecret":"${{ secrets.CLIENT_SECRET }}","subscriptionId":"${{ secrets.SUBSCRIPTION_ID }}","tenantId":"${{ secrets.TENANT_ID }}"}'
         
     - name: Azure CLI script
       uses: azure/CLI@v1
@@ -94,4 +94,4 @@ jobs:
 
     - name: Deploy Kubernetes Manifests
       run: |
-        kubectl apply -f ${{env.working-directory-k8s}}
+        kubectl cluster-info

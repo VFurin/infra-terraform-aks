@@ -1,9 +1,10 @@
 name: Terraform-AKS-Deployment
 
 on:
+  pull_request:
+    types: [opened]
   push:
     branches: [ "main" ]
-  pull_request:
 
 env:
   working-directory: infra_terraform
@@ -16,11 +17,10 @@ env:
   CLUSTER_NAME: "tech-challenge-aks-cluster"
 
 permissions:
-  id-token: write
-  contents: read
+  pull-requests: write
   
 jobs:          
-  setup-terraform:
+  terraform:
     runs-on: ubuntu-latest
    
     steps:
@@ -31,61 +31,71 @@ jobs:
       uses: hashicorp/setup-terraform@v1
       with:
         terraform_wrapper: false
+
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check
+      working-directory: ${{env.working-directory}}
     
     - name: Terraform Init
       id: init
       run: terraform init
       working-directory: ${{env.working-directory}}
 
-  terraform-validate:
-    needs: setup-terraform
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
-
     - name: Terraform Validate
       id: validate
       run: terraform validate
       working-directory: ${{env.working-directory}}
 
-  terraform-plan:
-    needs: terraform-validate
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
-
     - name: Terraform Plan
       id: plan
-      run: terraform plan -no-color
+      if: github.event_name == 'pull_request'
+      run: terraform plan -no-color -input=false
+      continue-on-error: true
       working-directory: ${{env.working-directory}}
 
-  terraform-apply:
-    needs: terraform-plan
-    runs-on: ubuntu-latest
+    - name: Update Pull Request
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      env:
+        PLAN: ${{ steps.plan.outputs.stdout }}
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+          #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+          #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+          #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
 
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
+          <details><summary>Show Plan</summary>
 
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
+          \`\`\`terraform\n
+          ${process.env.PLAN}
+          \`\`\`
 
+          </details>
+
+          *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
+    - name: Terraform Plan Status
+      if: steps.plan.outcome == 'failure'
+      run: exit 1
+    
     - name: Terraform Apply
       id: apply
-      run: terraform apply -auto-approve
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: terraform apply -auto-approve -input=false
       working-directory: ${{env.working-directory}}
 
   terraform-output:
-    needs: terraform-apply
+    needs: terraform
     runs-on: ubuntu-latest
 
     steps:
